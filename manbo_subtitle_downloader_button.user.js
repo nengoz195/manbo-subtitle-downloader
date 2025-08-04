@@ -54,12 +54,12 @@
   }
 
   const fetchFile = async (op) => new Promise((resolve, reject) => {
-    if (!op.u) reject(Error("链接错误，请联系作者"));
+    if (!op.u) reject(Error("Liên kết bị lỗi，vui lòng liên hệ với tác giả"));
     GM_xmlhttpRequest({
       method: "get",
       url: op.u,
       onload: resp => resolve(resp.response),
-      onerror: () => reject(Error("网络请求失败")),
+      onerror: () => reject(Error("Yêu cầu mạng thất bại")),
       responseType: 'blob'
     });
   });
@@ -78,15 +78,15 @@
 
   const startZip = async (lists, title) => {
     const zipWriter = new zip.ZipWriter(new zip.BlobWriter("application/zip"));
-    alert.fire({ title: '正在准备下载...', icon: 'info', timer: 1000 });
+    alert.fire({ title: 'Đang chuẩn bị tải xuống...', icon: 'info', timer: 1000 });
 
     const bloblists = await Promise.all(lists.map(a => fetchFile({ u: a[1], n: a[0] }))).catch(e => {
-      alert.fire({ title: '文件请求失败', icon: 'error', text: e.message });
+      alert.fire({ title: 'Yêu cầu tệp thất bại', icon: 'error', text: e.message });
       downloading = false;
     });
 
     if (!bloblists || !bloblists.length) {
-      alert.fire({ title: '暂无字幕文件', icon: 'error' });
+      alert.fire({ title: 'Tạm thời không có file phụ đề', icon: 'error' });
       downloading = false;
       return;
     }
@@ -122,7 +122,7 @@
           if (!header) return;
           if (!document.querySelector('#download-subs-btn')) {
             const btn = document.createElement('button');
-            btn.textContent = '📥 下载字幕';
+            btn.textContent = '📥 Tải phụ đề';
             btn.id = 'download-subs-btn';
             btn.style.cssText = 'margin-left: 20px; padding: 4px 10px; font-size: 14px; background-color: #4caf50; color: white; border: none; border-radius: 6px; cursor: pointer;';
             header.appendChild(btn);
@@ -131,12 +131,12 @@
               if (d.length === 0) return Swal.fire('数据获取失败', '暂无数据', 'error');
               if (downloading) return alert.fire({ title: '请等待下载完成', icon: 'error' });
               alert.fire({
-                title: '请选择操作',
+                title: 'Vui lòng chọn thao tác',
                 icon: 'question',
                 showConfirmButton: true,
-                confirmButtonText: '复制全部链接',
+                confirmButtonText: 'Sao chép link',
                 showDenyButton: true,
-                denyButtonText: '全部打包下载',
+                denyButtonText: 'Tải xuống hết',
                 denyButtonColor: '#4caf50',
               }).then(result => {
                 if (result.isConfirmed) {
