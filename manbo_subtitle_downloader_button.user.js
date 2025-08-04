@@ -4,7 +4,7 @@
 // @namespace    manbo.kilamanbo.subs
 // @version      1.1
 // @description  漫播字幕一键下载与复制链接功能，带按钮界面操作，更直观方便！
-// @author       ChatGPT@Ne
+// @author       Thien Truong Dia Cuu
 // @match        https://kilamanbo.com/manbo/pc/detail*
 // @match        https://manbo.kilakila.cn/manbo/pc/detail*
 // @match        https://manbo.hongdoulive.com/Activecard/radioplay*
