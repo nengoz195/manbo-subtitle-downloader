@@ -379,15 +379,13 @@
 
         const uniqueAllDramaImageUrls = new Set();
         // Extract setPic from each episode in subtitleData (which comes from setRespList)
-        subtitleData.forEach(episode => {
-            // episode structure: [title, lrcUrl, setIdStr]
-            // We need to access the original setPic from the full setRespList object
-            // For now, we rely on the ajaxHooker to populate allDramaImageData directly from setRespList
-            // if it were structured differently.
-            // Given the provided JSON, `setPic` is directly in the episode object.
-            // We just need to make sure `subtitleData` also contains `setPic` if we want to extract from it here.
-            // Let's modify the `ajaxHooker` to directly populate `allDramaImageData` from `setRespList` `setPic`.
-        });
+        // episode structure: [title, lrcUrl, setIdStr]
+        // We need to access the original setPic from the full setRespList object
+        // For now, we rely on the ajaxHooker to populate allDramaImageData directly from setRespList
+        // if it were structured differently.
+        // Given the provided JSON, `setPic` is directly in the episode object.
+        // We just need to make sure `subtitleData` also contains `setPic` if we want to extract from it here.
+        // Let's modify the `ajaxHooker` to directly populate `allDramaImageData` from `setRespList` `setPic`.
         // This function will be called by ajaxHooker directly upon receiving the dramaDetail response.
         // So no need to iterate subtitleData again here.
     }
@@ -493,23 +491,6 @@
         subtitleSectionTitle.innerHTML = '<i>🐾</i> Tải TOÀN BỘ Drama (ZIP):'; // Icon changed to paws
         panelBody.appendChild(subtitleSectionTitle);
 
-        // Phụ đề LRC (Copy link)
-        const btnLRC = document.createElement('button');
-        btnLRC.classList.add('download-option-btn');
-        btnLRC.innerHTML = '<i></i> Phụ đề LRC';
-        btnLRC.querySelector('i').classList.add('icon-lrc');
-        panelBody.appendChild(btnLRC);
-        btnLRC.onclick = () => {
-            if (subtitleData.length === 0) return Swal.fire('Không có dữ liệu phụ đề', 'Bạn đã vào trang chi tiết tập chưa?', 'error');
-            const linksToCopy = subtitleData.filter(x => x[1]).map(x => x[1] + '#' + x[0]).join('\n');
-            if (linksToCopy) {
-                GM_setClipboard(linksToCopy, 'text');
-                toast.fire('Sao chép thành công!', 'Đã sao chép tất cả liên kết phụ đề (LRC) 💌', 'success');
-            } else {
-                toast.fire('Không có liên kết LRC để sao chép', '', 'info');
-            }
-        };
-
         // Phụ đề LRC (Download all) - Assuming Lrc is the primary subtitle type for Manbo
         const btnDownloadAllLRC = document.createElement('button');
         btnDownloadAllLRC.classList.add('download-option-btn');
@@ -541,23 +522,6 @@
             startZipImages(imageData, `${currentDramaTitle}_Episode`);
         };
 
-        // Sao chép liên kết ảnh tập hiện tại
-        const btnCopyCurrentEpisodeImageLinks = document.createElement('button');
-        btnCopyCurrentEpisodeImageLinks.classList.add('download-option-btn');
-        btnCopyCurrentEpisodeImageLinks.innerHTML = '<i></i> Sao chép liên kết ảnh tập hiện tại';
-        btnCopyCurrentEpisodeImageLinks.querySelector('i').classList.add('icon-cover'); // Reusing icon
-        panelBody.appendChild(btnCopyCurrentEpisodeImageLinks);
-        btnCopyCurrentEpisodeImageLinks.onclick = () => {
-            updateCurrentEpisodeImageList(); // Scrape DOM images one more time right before action
-            if (imageData.length === 0) return Swal.fire('Không tìm thấy ảnh', 'Hãy cuộn trang hoặc chờ tải API để có thêm ảnh.', 'error');
-            if (imageData.length > 0) {
-                GM_setClipboard(imageData.join('\n'), 'text');
-                toast.fire('Sao chép thành công!', 'Đã sao chép tất cả liên kết ảnh tập hiện tại 💌', 'success');
-            } else {
-                 toast.fire('Không có liên kết để sao chép', '', 'info');
-            }
-        };
-
         // Tải TẤT CẢ ảnh Drama (toàn bộ các tập)
         const btnDownloadAllDramaImages = document.createElement('button');
         btnDownloadAllDramaImages.classList.add('download-option-btn');
@@ -567,22 +531,6 @@
         btnDownloadAllDramaImages.onclick = () => {
             if (allDramaImageData.length === 0) return Swal.fire('Không tìm thấy ảnh', 'Chưa có dữ liệu ảnh cho toàn bộ drama. Hãy đảm bảo bạn đã vào trang chi tiết drama chính.', 'warning');
             startZipImages(allDramaImageData, `${currentDramaTitle}_All_Drama`);
-        };
-
-        // Sao chép TẤT CẢ liên kết ảnh Drama (toàn bộ các tập)
-        const btnCopyAllDramaImageLinks = document.createElement('button');
-        btnCopyAllDramaImageLinks.classList.add('download-option-btn');
-        btnCopyAllDramaImageLinks.innerHTML = '<i></i> Sao chép TẤT CẢ liên kết ảnh Drama';
-        btnCopyAllDramaImageLinks.querySelector('i').classList.add('icon-all-images'); // Reusing icon
-        panelBody.appendChild(btnCopyAllDramaImageLinks);
-        btnCopyAllDramaImageLinks.onclick = () => {
-            if (allDramaImageData.length === 0) return Swal.fire('Không tìm thấy ảnh', 'Chưa có dữ liệu ảnh cho toàn bộ drama. Hãy đảm bảo bạn đã vào trang chi tiết drama chính.', 'warning');
-            if (allDramaImageData.length > 0) {
-                GM_setClipboard(allDramaImageData.join('\n'), 'text');
-                toast.fire('Sao chép thành công!', 'Đã sao chép tất cả liên kết ảnh toàn bộ drama 💌', 'success');
-            } else {
-                 toast.fire('Không có liên kết để sao chép', '', 'info');
-            }
         };
 
 
