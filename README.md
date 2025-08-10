@@ -1,2 +1,2 @@
-# manbo-subtitle-downloader
-[Cài ở đây](https://raw.githubusercontent.com/nengoz195/manbo-subtitle-downloader/main/manbo_subtitle_downloader_button.user.js)
+# manbo-subtitle-image-downloader
+[Cài ở đây](https://github.com/nengoz195/manbo-subtitle-image-downloader/raw/refs/heads/main/manbo_subtitle_downloader_button.user.js)
