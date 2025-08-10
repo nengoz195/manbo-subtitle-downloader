@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Manbo Media Downloader (Cute Pink Panel Edition - Optimized Images)
 // @namespace    manbo.kilamanbo.media
-// @version      3.2 // ASS conversion - no empty lines
+// @version      3.2 // Chuyển đổi ASS - không dòng trống
 // @description  Tải phụ đề và ảnh từ Manbo với giao diện cute hồng, trực quan và dễ sử dụng! Các tùy chọn tải xuống được đặt trong một bảng điều khiển nổi. Ảnh lấy từ API (setPic) và các phần tử DOM cụ thể.
 // @author       Thien Truong Dia Cuu
 // @match        https://kilamanbo.com/manbo/pc/detail*
@@ -29,39 +29,39 @@
     'use strict';
 
     let isDownloading = false;
-    let subtitleData = []; // To store subtitle info: [title, lrcUrl, setIdStr] for ALL episodes
-    let currentEpisodeLrcUrl = null; // To store LRC URL of the currently viewed episode
-    let imageData = [];    // To store image URLs (from current page API/DOM)
-    let allDramaImageData = []; // To store ALL images from ALL episodes (from setPic)
+    let subtitleData = []; // Để lưu thông tin phụ đề: [tiêu đề, lrcUrl, setIdStr] cho TẤT CẢ các tập
+    let currentEpisodeLrcUrl = null; // Để lưu URL LRC của tập đang xem
+    let imageData = [];    // Để lưu các URL ảnh (từ trang hiện tại API/DOM)
+    let allDramaImageData = []; // Để lưu TẤT CẢ ảnh từ TẤT CẢ các tập (từ setPic)
     let currentDramaTitle = 'Manbo';
-    let currentEpisodeTitle = 'Tập hiện tại'; // Default title for current episode
+    let currentEpisodeTitle = 'Tập hiện tại'; // Tiêu đề mặc định cho tập hiện tại
 
-    // --- Custom Styles for Cute Pink Panel Edition ---
+    // --- Các kiểu tùy chỉnh cho Phiên bản Bảng điều khiển màu hồng dễ thương ---
     GM_addStyle(`
-        /* Main panel container */
+        /* Vùng chứa bảng điều khiển chính */
         #manbo-downloader-panel {
             position: fixed;
             top: 20%;
             right: 20px;
-            width: 280px; /* Adjusted width for better fit */
-            background: linear-gradient(135deg, #ffe0ee, #fff0f6); /* Light pink gradient */
+            width: 280px; /* Chiều rộng được điều chỉnh để vừa vặn hơn */
+            background: linear-gradient(135deg, #ffe0ee, #fff0f6); /* Gradient hồng nhạt */
             border-radius: 15px;
             box-shadow: 0 8px 20px rgba(255, 126, 185, 0.4);
             z-index: 9999;
             font-family: 'Quicksand', sans-serif, 'Comic Sans MS';
             padding: 15px;
-            box-sizing: border-box; /* Include padding in width */
-            border: 1px solid #ffb3d9; /* Subtle border */
+            box-sizing: border-box; /* Bao gồm phần đệm trong chiều rộng */
+            border: 1px solid #ffb3d9; /* Viền tinh tế */
         }
 
-        /* Panel Header */
+        /* Tiêu đề bảng điều khiển */
         #manbo-downloader-panel .panel-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 15px;
             padding-bottom: 10px;
-            border-bottom: 1px dashed #ffb3d9; /* Dashed line */
+            border-bottom: 1px dashed #ffb3d9; /* Đường gạch ngang */
         }
         #manbo-downloader-panel .panel-title {
             color: #ff4d94;
@@ -72,7 +72,7 @@
         }
         #manbo-downloader-panel .panel-title span {
             margin-right: 8px;
-            font-size: 1.5em; /* Larger emoji */
+            font-size: 1.5em; /* Biểu tượng cảm xúc lớn hơn */
         }
         #manbo-downloader-panel .toggle-button {
             background: none;
@@ -86,20 +86,20 @@
             transform: rotate(-90deg);
         }
 
-        /* Panel Body (collapsible) */
+        /* Thân bảng điều khiển (có thể thu gọn) */
         #manbo-downloader-panel .panel-body {
-            max-height: 500px; /* Max height before scroll */
-            overflow-y: auto; /* Scroll if content overflows */
+            max-height: 500px; /* Chiều cao tối đa trước khi cuộn */
+            overflow-y: auto; /* Cuộn nếu nội dung tràn */
             transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
             opacity: 1;
         }
         #manbo-downloader-panel.collapsed .panel-body {
             max-height: 0;
             opacity: 0;
-            overflow: hidden; /* Hide overflow when collapsed */
+            overflow: hidden; /* Ẩn tràn khi thu gọn */
         }
 
-        /* Section titles */
+        /* Tiêu đề phần */
         .panel-section-title {
             color: #d63384;
             font-weight: bold;
@@ -115,15 +115,15 @@
         }
 
 
-        /* Download buttons */
+        /* Nút tải xuống */
         .download-option-btn {
             display: flex;
             align-items: center;
             width: 100%;
             padding: 10px 15px;
             margin-bottom: 8px;
-            background: linear-gradient(135deg, #ffcce5, #ffaad5); /* Lighter pink for options */
-            color: #8c004d; /* Darker pink text */
+            background: linear-gradient(135deg, #ffcce5, #ffaad5); /* Hồng nhạt hơn cho các tùy chọn */
+            color: #8c004d; /* Văn bản màu hồng đậm hơn */
             font-weight: bold;
             border: none;
             border-radius: 10px;
@@ -140,57 +140,57 @@
         }
         .download-option-btn i {
             margin-right: 10px;
-            font-size: 1.2em; /* Icon size */
-            color: #ff4d94; /* Icon color */
+            font-size: 1.2em; /* Kích thước biểu tượng */
+            color: #ff4d94; /* Màu biểu tượng */
         }
-        /* Icon styles (using unicode characters for simplicity, can use actual images/svgs if preferred) */
+        /* Kiểu biểu tượng (sử dụng ký tự unicode cho đơn giản, có thể sử dụng hình ảnh/svg thực tế nếu muốn) */
         .icon-lrc:before { content: '💬'; }
-        .icon-json-srt:before { content: '📄'; } /* Changed from document to paper */
-        .icon-ass:before { content: '📝'; } /* Changed from document with pen */
+        .icon-json-srt:before { content: '📄'; } /* Thay đổi từ tài liệu sang giấy */
+        .icon-ass:before { content: '📝'; } /* Thay đổi từ tài liệu có bút */
         .icon-audio:before { content: '🎧'; }
         .icon-cover:before { content: '🖼️'; }
-        .icon-all-images:before { content: '🎀'; } /* Ribbon for "All images" */
-        .icon-single-image:before { content: '📸'; } /* New icon for single episode image */
+        .icon-all-images:before { content: '🎀'; } /* Ruy băng cho "Tất cả ảnh" */
+        .icon-single-image:before { content: '📸'; } /* Biểu tượng mới cho ảnh tập đơn */
 
 
-        /* SweetAlert2 Styles (consistent pink theme) */
+        /* Kiểu SweetAlert2 (chủ đề màu hồng nhất quán) */
         .swal2-popup {
             border-radius: 20px !important;
-            background: #fff0f6 !important; /* Light pink background */
+            background: #fff0f6 !important; /* Nền hồng nhạt */
             font-family: 'Quicksand', sans-serif, 'Arial' !important;
         }
         .swal2-title {
-            color: #ff4d94 !important; /* Darker pink for title */
+            color: #ff4d94 !important; /* Hồng đậm hơn cho tiêu đề */
             font-weight: bold !important;
         }
         .swal2-content {
-            color: #d63384 !important; /* Medium pink for content */
+            color: #d63384 !important; /* Hồng vừa cho nội dung */
         }
         .swal2-styled.swal2-confirm {
-            background-color: #ff7eb9 !important; /* Main button pink */
+            background-color: #ff7eb9 !important; /* Hồng nút chính */
             border-radius: 20px !important;
             font-weight: bold !important;
             color: white !important;
         }
         .swal2-styled.swal2-deny {
-            background-color: #ffb3d9 !important; /* Secondary button pink */
+            background-color: #ffb3d9 !important; /* Hồng nút phụ */
             border-radius: 20px !important;
             font-weight: bold !important;
             color: white !important;
         }
         .swal2-styled.swal2-cancel {
-            background-color: #ffe0ee !important; /* Lightest pink for cancel */
+            background-color: #ffe0ee !important; /* Hồng nhạt nhất cho hủy */
             border-radius: 20px !important;
             font-weight: bold !important;
             color: #d63384 !important;
         }
         .swal2-progress-bar {
-            background-color: #ff7eb9 !important; /* Pink progress bar */
+            background-color: #ff7eb9 !important; /* Thanh tiến trình màu hồng */
         }
         .swal2-timer-progress-bar {
-            background-color: #ff7eb9 !important; /* Pink timer bar */
+            background-color: #ff7eb9 !important; /* Thanh thời gian màu hồng */
         }
-        /* Disable text selection on toasts */
+        /* Vô hiệu hóa chọn văn bản trên toast */
         .disableSelection {
             user-select: none;
             -webkit-user-select: none;
@@ -199,11 +199,11 @@
         }
     `);
 
-    // Load external CSS resources
+    // Tải tài nguyên CSS bên ngoài
     GM_addStyle(GM_getResourceText('swalStyle'));
     GM_addStyle(GM_getResourceText('layuiStyle'));
 
-    // --- SweetAlert2 Mixin for Toasts ---
+    // --- SweetAlert2 Mixin cho Toasts ---
     const toast = Swal.mixin({
         toast: true,
         position: 'top',
@@ -216,12 +216,12 @@
         customClass: { container: 'disableSelection' }
     });
 
-    // --- Utility Functions ---
+    // --- Hàm tiện ích ---
 
     /**
-     * Tracks progress of multiple Promises.
-     * @param {Promise[]} proms - Array of Promises.
-     * @param {(progress: number) => void} progress_cb - Callback for progress updates (0-100).
+     * Theo dõi tiến độ của nhiều Promise.
+     * @param {Promise[]} proms - Mảng các Promise.
+     * @param {(progress: number) => void} progress_cb - Callback cho cập nhật tiến độ (0-100).
      */
     function allProgress(proms, progress_cb) {
         let done = 0;
@@ -233,10 +233,10 @@
     }
 
     /**
-     * Fetches a file using GM_xmlhttpRequest.
-     * @param {string} url - The URL of the file.
-     * @param {string} [responseType='blob'] - The desired response type.
-     * @returns {Promise<Blob|string>} A Promise that resolves with the response.
+     * Lấy tệp bằng GM_xmlhttpRequest.
+     * @param {string} url - URL của tệp.
+     * @param {string} [responseType='blob'] - Loại phản hồi mong muốn.
+     * @returns {Promise<Blob|string>} Một Promise giải quyết với phản hồi.
      */
     const fetchFile = (url, responseType = 'blob') => new Promise((resolve, reject) => {
         if (!url) {
@@ -258,9 +258,9 @@
     });
 
     /**
-     * Initiates a file download in the browser.
-     * @param {Blob|string} data - The Blob or URL of the file to download.
-     * @param {string} fileName - The desired file name.
+     * Bắt đầu tải tệp trong trình duyệt.
+     * @param {Blob|string} data - Blob hoặc URL của tệp để tải xuống.
+     * @param {string} fileName - Tên tệp mong muốn.
      */
     const downloadFile = (data, fileName) => {
         const a = document.createElement("a");
@@ -271,33 +271,33 @@
         a.click();
         a.remove();
         if (typeof data !== "string") {
-            URL.revokeObjectURL(a.href); // Clean up the Blob URL
+            URL.revokeObjectURL(a.href); // Dọn dẹp URL Blob
         }
         isDownloading = false;
     };
 
     /**
-     * Cleans up a string for use as a filename by removing invalid characters.
-     * @param {string} name - The original string.
-     * @returns {string} The cleaned string.
+     * Làm sạch một chuỗi để sử dụng làm tên tệp bằng cách loại bỏ các ký tự không hợp lệ.
+     * @param {string} name - Chuỗi gốc.
+     * @returns {string} Chuỗi đã làm sạch.
      */
     const sanitizeFilename = (name) => {
-        // Remove invalid characters for filenames: / \ ? % * : | " < >
+        // Loại bỏ các ký tự không hợp lệ cho tên tệp: / \ ? % * : | " < >
         return name.replace(/[\/\\?%*:|"<>]/g, '_')
-                   .replace(/\s+/g, ' ') // Replace multiple spaces with a single space
-                   .trim(); // Trim leading/trailing spaces
+                   .replace(/\s+/g, ' ') // Thay thế nhiều khoảng trắng bằng một khoảng trắng
+                   .trim(); // Cắt bỏ khoảng trắng đầu/cuối
     };
 
     /**
-     * Converts LRC formatted subtitle text to ASS (Advanced SubStation Alpha) format.
-     * This is a basic conversion, only handling timestamps and text.
-     * @param {string} lrcText - The LRC subtitle content.
-     * @returns {string} The ASS subtitle content.
+     * Chuyển đổi văn bản phụ đề định dạng LRC sang định dạng ASS (Advanced SubStation Alpha).
+     * Đây là một chuyển đổi cơ bản, chỉ xử lý dấu thời gian và văn bản.
+     * @param {string} lrcText - Nội dung phụ đề LRC.
+     * @returns {string} Nội dung phụ đề ASS.
      */
     function convertLrcToAss(lrcText) {
         let assContent = `[Script Info]
-; Script generated by Manbo Media Downloader
-Title: Converted from LRC
+; Script được tạo bởi Manbo Media Downloader
+Title: Chuyển đổi từ LRC
 ScriptType: v4.00+
 Collisions: Normal
 PlayResX: 1280
@@ -314,25 +314,25 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
         const parsedLines = [];
         lrcText.split('\n').forEach(line => {
-            // Regex to capture timestamp and the remaining text.
+            // Regex để bắt dấu thời gian và phần văn bản còn lại.
             const match = line.match(/^\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)/);
             if (match) {
                 const minutes = parseInt(match[1]);
                 const seconds = parseInt(match[2]);
                 const milliseconds = parseInt(match[3]) * (match[3].length === 2 ? 10 : 1);
-                const text = match[4].trim(); // Get the text part and trim it
+                const text = match[4].trim(); // Lấy phần văn bản và cắt bỏ khoảng trắng
 
                 parsedLines.push({
-                    time: minutes * 60000 + seconds * 1000 + milliseconds, // Total milliseconds
+                    time: minutes * 60000 + seconds * 1000 + milliseconds, // Tổng số mili giây
                     text: text
                 });
             }
         });
 
-        // Sort lines by time to ensure correct chronological order
+        // Sắp xếp các dòng theo thời gian để đảm bảo thứ tự thời gian chính xác
         parsedLines.sort((a, b) => a.time - b.time);
 
-        // Function to format milliseconds to ASS time format H:MM:SS.CC
+        // Hàm định dạng mili giây sang định dạng thời gian ASS H:MM:SS.CC
         const formatAssTime = (ms) => {
             const h = Math.floor(ms / 3600000);
             const m = Math.floor((ms % 3600000) / 60000);
@@ -350,25 +350,24 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             let endTime;
 
             if (next) {
-                // Set end time to 1 millisecond before the next line starts
+                // Đặt thời gian kết thúc là 1 mili giây trước khi dòng tiếp theo bắt đầu
                 endTime = next.time - 1;
-                // Ensure end time is not before start time
+                // Đảm bảo thời gian kết thúc không nhỏ hơn thời gian bắt đầu
                 if (endTime < startTime) {
-                    endTime = startTime; // If next line starts immediately or before, end at start time
+                    endTime = startTime; // Nếu dòng tiếp theo bắt đầu ngay lập tức hoặc trước đó, kết thúc tại thời gian bắt đầu
                 }
             } else {
-                // If it's the last line, give it a default duration (e.g., 5 seconds)
+                // Nếu là dòng cuối cùng, cho nó một khoảng thời gian mặc định (ví dụ: 5 giây)
                 endTime = startTime + 5000;
             }
 
             const assStartTime = formatAssTime(startTime);
             const assEndTime = formatAssTime(endTime);
 
-            // Escape ASS special characters like '{', '}', and '\'
+            // Thoát các ký tự đặc biệt của ASS như '{', '}', và '\'
             const escapedText = current.text.replace(/\\/g, '\\\\').replace(/{/g, '\\{').replace(/}/g, '\\}');
 
-            // Only add line if there's actual text content to avoid truly empty subtitle events
-            // This is the line changed based on your request: `if (escapedText.length > 0)`
+            // Chỉ thêm dòng nếu có nội dung văn bản thực tế để tránh các sự kiện phụ đề thực sự trống
             if (escapedText.length > 0) {
                  assContent += `Dialogue: 0,${assStartTime},${assEndTime},Default,,0,0,0,,${escapedText}\n`;
             }
@@ -378,20 +377,20 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     }
 
 
-    // --- Subtitle Downloader Logic ---
+    // --- Logic tải phụ đề ---
 
     /**
-     * Starts the process of zipping and downloading subtitles.
-     * @param {Array<Array<string>>} lists - Array of [title, lrcUrl, setIdStr] for subtitles.
-     * @param {string} dramaTitle - The title of the radio drama.
-     * @param {string} targetFormat - 'lrc' or 'ass'.
+     * Bắt đầu quá trình nén và tải xuống phụ đề.
+     * @param {Array<Array<string>>} lists - Mảng [tiêu đề, lrcUrl, setIdStr] cho phụ đề.
+     * @param {string} dramaTitle - Tiêu đề của drama âm thanh.
+     * @param {string} targetFormat - 'lrc' hoặc 'ass'.
      */
     const startZipSubtitles = async (lists, dramaTitle, targetFormat) => {
         if (isDownloading) {
             return toast.fire({ title: 'Đang tải về, vui lòng chờ...', icon: 'warning' });
         }
         isDownloading = true;
-        const subtitlesToDownload = lists.filter(a => a[1]); // Filter out entries without a URL
+        const subtitlesToDownload = lists.filter(a => a[1]); // Lọc các mục không có URL
         if (subtitlesToDownload.length === 0) {
             toast.fire({ title: 'Tạm thời không có file phụ đề để tải.', icon: 'error' });
             isDownloading = false;
@@ -407,7 +406,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 throw new Error(`Lỗi tải phụ đề: ${e.message}`);
             });
 
-            // Convert texts if targetFormat is ASS
+            // Chuyển đổi văn bản nếu targetFormat là ASS
             const processedSubtitles = subtitleTexts.map((text, i) => {
                 const originalTitle = subtitlesToDownload[i][0];
                 const originalUrl = subtitlesToDownload[i][1];
@@ -423,13 +422,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 };
             });
 
-            // Create CSV content
+            // Tạo nội dung CSV
             const CSVContent = "\ufeff文件名,tải xuống liên kết\n" +
                                processedSubtitles.map(s => `${sanitizeFilename(s.title)}.${s.format},${s.url}`).join("\n") +
                                `\n\n(C) ChatGPT Script by Ne\nĐóng gói thời gian：${new Date().toISOString()}`;
             const CSVBlob = new zip.TextReader(CSVContent);
 
-            // Add files to zip
+            // Thêm tệp vào zip
             const addPromises = [
                 zipWriter.add("filelist.csv", CSVBlob),
                 ...processedSubtitles.map(s =>
@@ -437,7 +436,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 )
             ];
 
-            // Show progress bar for zipping
+            // Hiển thị thanh tiến trình cho quá trình nén
             const swalProgressBar = Swal.fire({
                 title: `Đang đóng gói phụ đề ${targetFormat.toUpperCase()}...`,
                 html: `0% hoàn thành<br><progress id="swal-zip-progress-subtitle" max="100" value="0"></progress>`,
@@ -460,7 +459,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             }).catch(e => {
                 throw new Error(`Lỗi khi thêm tệp phụ đề vào ZIP: ${e.message}`);
             });
-            swalProgressBar.then(() => Swal.close()); // Close the progress bar
+            swalProgressBar.then(() => Swal.close()); // Đóng thanh tiến trình
 
             downloadFile(await zipWriter.close(), `Manbo_Subtitles_${sanitizeFilename(dramaTitle)}_${targetFormat.toUpperCase()}.zip`);
             toast.fire({ title: `Tải phụ đề ${targetFormat.toUpperCase()} hoàn tất!`, icon: 'success' });
@@ -472,52 +471,53 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     };
 
 
-    // --- Image Downloader Logic (API setPic & Specific DOM) ---
+    // --- Logic tải ảnh (API setPic & DOM cụ thể) ---
 
     /**
-     * Extracts image URLs from specific DOM elements.
-     * @returns {string[]} An array of image URLs found in specified DOM elements.
+     * Trích xuất URL ảnh từ các phần tử DOM cụ thể.
+     * @returns {string[]} Một mảng các URL ảnh tìm thấy trong các phần tử DOM được chỉ định.
      */
     function getImagesFromSpecificDOM() {
-        const urls = new Set(); // Use Set to automatically handle duplicates
+        const urls = new Set(); // Sử dụng Set để tự động xử lý trùng lặp
 
-        // 1. Get from background-image of div.filter-bg-image
+        // 1. Lấy từ background-image của div.filter-bg-image
         document.querySelectorAll('div.filter-bg-image').forEach(div => {
             const style = div.style.backgroundImage;
             if (style) {
                 const match = style.match(/url\(['"]?(.*?)['"]?\)/);
                 if (match && match[1]) {
-                    urls.add(match[1].replace(/\?.*/, '')); // Add and remove query params
+                    urls.add(match[1].replace(/\?.*/, '')); // Thêm và loại bỏ các tham số truy vấn
                 }
             }
         });
 
-        // 2. Get from src of img.bgimg
+        // 2. Lấy từ src của img.bgimg
         document.querySelectorAll('img.bgimg').forEach(img => {
             if (img.src) {
-                urls.add(img.src.replace(/\?.*/, '')); // Add and remove query params
+                urls.add(img.src.replace(/\?.*/, '')); // Thêm và loại bỏ các tham số truy vấn
             }
         });
 
-        // Filter to ensure they are from kilamanbo.com if needed, though specific classes already narrow it
+        // Lọc để đảm bảo chúng từ kilamanbo.com nếu cần, mặc dù các lớp cụ thể đã thu hẹp nó
         return Array.from(urls).filter(url => url.includes('img.kilamanbo.com'));
     }
 
     /**
-     * Updates the global `imageData` for the current episode.
-     * This version combines new API URLs (from current episode's detail) and newly scraped DOM URLs.
-     * @param {string[]} [newApiUrlsFromCurrentEpisode=[]] - New image URLs to add from API for current episode.
+     * Cập nhật `imageData` toàn cầu cho tập hiện tại.
+     * Phiên bản này kết hợp các URL API mới (từ chi tiết tập hiện tại) và các URL DOM mới được cạo.
+     * @param {string[]} [newApiUrlsFromCurrentEpisode=[]] - Các URL ảnh mới để thêm từ API cho tập hiện tại.
      */
     function updateCurrentEpisodeImageList(newApiUrlsFromCurrentEpisode = []) {
         const domUrls = getImagesFromSpecificDOM();
-        imageData = [...new Set([...newApiUrlsFromCurrentEpisode, ...domUrls])];
-        console.log("Current Episode Image List (API & Specific DOM):", imageData);
+        // Kết hợp các URL mới từ API với các URL DOM hiện có, loại bỏ trùng lặp
+        imageData = [...new Set([...imageData, ...newApiUrlsFromCurrentEpisode, ...domUrls])];
+        console.log("Danh sách ảnh tập hiện tại (API & DOM cụ thể):", imageData);
     }
 
     /**
-     * Starts the process of zipping and downloading images.
-     * @param {string[]} list - Array of image URLs.
-     * @param {string} fileNamePrefix - Prefix for the zip file name.
+     * Bắt đầu quá trình nén và tải xuống ảnh.
+     * @param {string[]} list - Mảng các URL ảnh.
+     * @param {string} fileNamePrefix - Tiền tố cho tên tệp zip.
      */
     const startZipImages = async (list, fileNamePrefix) => {
         if (isDownloading) {
@@ -541,7 +541,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
             const addPromises = list.map((url, i) => {
                 const parts = url.split('/');
-                const filename = parts[parts.length - 1].split('?')[0]; // Get filename and remove query params
+                const filename = parts[parts.length - 1].split('?')[0]; // Lấy tên tệp và loại bỏ các tham số truy vấn
                 return zipWriter.add(filename, new zip.BlobReader(imageBlobs[i]));
             });
 
@@ -567,7 +567,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             }).catch(e => {
                 throw new Error(`Lỗi khi thêm tệp vào ZIP: ${e.message}`);
             });
-            swalProgressBar.then(() => Swal.close()); // Close the progress bar
+            swalProgressBar.then(() => Swal.close()); // Đóng thanh tiến trình
 
             downloadFile(await zipWriter.close(), `${sanitizeFilename(fileNamePrefix)}_Images.zip`);
             toast.fire({ title: 'Tải ảnh hoàn tất!', icon: 'success' });
@@ -578,20 +578,20 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         }
     };
 
-    // --- UI Panel Creation ---
+    // --- Tạo bảng điều khiển UI ---
 
     /**
-     * Creates and appends the main downloader panel to the page.
+     * Tạo và thêm bảng điều khiển tải xuống chính vào trang.
      */
     function createDownloaderPanel() {
         if (document.getElementById('manbo-downloader-panel')) {
-            return; // Panel already exists
+            return; // Bảng điều khiển đã tồn tại
         }
 
         const panel = document.createElement('div');
         panel.id = 'manbo-downloader-panel';
 
-        // Panel Header
+        // Tiêu đề bảng điều khiển
         const panelHeader = document.createElement('div');
         panelHeader.classList.add('panel-header');
         panel.appendChild(panelHeader);
@@ -603,36 +603,36 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
         const toggleButton = document.createElement('button');
         toggleButton.classList.add('toggle-button');
-        toggleButton.innerHTML = '▼'; // Down arrow
+        toggleButton.innerHTML = '▼'; // Mũi tên xuống
         panelHeader.appendChild(toggleButton);
 
-        // Panel Body (collapsible content)
+        // Thân bảng điều khiển (nội dung có thể thu gọn)
         const panelBody = document.createElement('div');
         panelBody.classList.add('panel-body');
         panel.appendChild(panelBody);
 
-        // --- Subtitle Section ---
+        // --- Phần phụ đề ---
         const subtitleSectionTitle = document.createElement('div');
         subtitleSectionTitle.classList.add('panel-section-title');
-        subtitleSectionTitle.innerHTML = '<i>🐾</i> Tải phụ đề:'; // Icon changed to paws
+        subtitleSectionTitle.innerHTML = '<i>🐾</i> Tải phụ đề:'; // Biểu tượng đổi thành dấu chân
         panelBody.appendChild(subtitleSectionTitle);
 
-        // Phụ đề LRC (Download all) - Assuming Lrc is the primary subtitle type for Manbo
+        // Phụ đề LRC (Tải tất cả) - Giả sử Lrc là loại phụ đề chính cho Manbo
         const btnDownloadAllLRC = document.createElement('button');
         btnDownloadAllLRC.classList.add('download-option-btn');
         btnDownloadAllLRC.innerHTML = '<i></i> Tải phụ đề LRC (Toàn bộ Drama)';
-        btnDownloadAllLRC.querySelector('i').classList.add('icon-json-srt'); // Reusing icon for generic subtitle download
+        btnDownloadAllLRC.querySelector('i').classList.add('icon-json-srt'); // Tái sử dụng biểu tượng cho tải phụ đề chung
         panelBody.appendChild(btnDownloadAllLRC);
         btnDownloadAllLRC.onclick = () => {
             if (subtitleData.length === 0) return Swal.fire('Không có dữ liệu phụ đề', 'Bạn đã vào trang chi tiết drama chính chưa?', 'error');
             startZipSubtitles(subtitleData, currentDramaTitle, 'lrc');
         };
 
-        // Tải phụ đề ASS (Download all) - New button
+        // Tải phụ đề ASS (Tải tất cả) - Nút mới
         const btnDownloadAllASS = document.createElement('button');
         btnDownloadAllASS.classList.add('download-option-btn');
         btnDownloadAllASS.innerHTML = '<i></i> Tải phụ đề ASS (Toàn bộ Drama)';
-        btnDownloadAllASS.querySelector('i').classList.add('icon-ass'); // Using icon-ass
+        btnDownloadAllASS.querySelector('i').classList.add('icon-ass'); // Sử dụng icon-ass
         panelBody.appendChild(btnDownloadAllASS);
         btnDownloadAllASS.onclick = () => {
             if (subtitleData.length === 0) return Swal.fire('Không có dữ liệu phụ đề', 'Bạn đã vào trang chi tiết drama chính chưa?', 'error');
@@ -643,7 +643,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         const btnDownloadCurrentEpisodeLRC = document.createElement('button');
         btnDownloadCurrentEpisodeLRC.classList.add('download-option-btn');
         btnDownloadCurrentEpisodeLRC.innerHTML = '<i></i> Tải phụ đề LRC (Tập hiện tại)';
-        btnDownloadCurrentEpisodeLRC.querySelector('i').classList.add('icon-lrc'); // Using icon-lrc for single subtitle
+        btnDownloadCurrentEpisodeLRC.querySelector('i').classList.add('icon-lrc'); // Sử dụng icon-lrc cho phụ đề đơn
         panelBody.appendChild(btnDownloadCurrentEpisodeLRC);
         btnDownloadCurrentEpisodeLRC.onclick = async () => {
             if (isDownloading) {
@@ -656,7 +656,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             toast.fire({ title: 'Đang tải phụ đề LRC tập hiện tại...', icon: 'info' });
             try {
                 const lrcText = await fetchFile(currentEpisodeLrcUrl, 'text');
-                // Use currentEpisodeTitle for the filename if available, fallback to a generic name
+                // Sử dụng currentEpisodeTitle cho tên tệp nếu có, nếu không thì dùng tên chung
                 const filename = `${sanitizeFilename(currentDramaTitle)}_${sanitizeFilename(currentEpisodeTitle)}.lrc`;
                 downloadFile(new Blob([lrcText], { type: 'text/plain;charset=utf-8' }), filename);
                 toast.fire({ title: 'Tải phụ đề LRC tập hiện tại hoàn tất!', icon: 'success' });
@@ -671,7 +671,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         const btnDownloadCurrentEpisodeASS = document.createElement('button');
         btnDownloadCurrentEpisodeASS.classList.add('download-option-btn');
         btnDownloadCurrentEpisodeASS.innerHTML = '<i></i> Tải phụ đề ASS (Tập hiện tại)';
-        btnDownloadCurrentEpisodeASS.querySelector('i').classList.add('icon-ass'); // Using icon-ass
+        btnDownloadCurrentEpisodeASS.querySelector('i').classList.add('icon-ass'); // Sử dụng icon-ass
         panelBody.appendChild(btnDownloadCurrentEpisodeASS);
         btnDownloadCurrentEpisodeASS.onclick = async () => {
             if (isDownloading) {
@@ -696,7 +696,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         };
 
 
-        // --- Image Section ---
+        // --- Phần ảnh ---
         const imageSectionTitle = document.createElement('div');
         imageSectionTitle.classList.add('panel-section-title');
         imageSectionTitle.innerHTML = '<i></i> Tải ảnh Drama:';
@@ -707,10 +707,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         const btnDownloadCurrentEpisodeImages = document.createElement('button');
         btnDownloadCurrentEpisodeImages.classList.add('download-option-btn');
         btnDownloadCurrentEpisodeImages.innerHTML = '<i></i> Tải ảnh tập hiện tại';
-        btnDownloadCurrentEpisodeImages.querySelector('i').classList.add('icon-single-image'); // New icon
+        btnDownloadCurrentEpisodeImages.querySelector('i').classList.add('icon-single-image'); // Biểu tượng mới
         panelBody.appendChild(btnDownloadCurrentEpisodeImages);
         btnDownloadCurrentEpisodeImages.onclick = () => {
-            updateCurrentEpisodeImageList(); // Scrape DOM images one more time right before action
+            updateCurrentEpisodeImageList(); // Cạo ảnh DOM một lần nữa ngay trước khi hành động
             if (imageData.length === 0) return Swal.fire('Không tìm thấy ảnh', 'Hãy cuộn trang hoặc chờ tải API để có thêm ảnh.', 'error');
             startZipImages(imageData, `${sanitizeFilename(currentDramaTitle)}_${sanitizeFilename(currentEpisodeTitle)}`);
         };
@@ -727,39 +727,36 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         };
 
 
-        // --- Toggle Panel Functionality ---
+        // --- Chức năng chuyển đổi bảng điều khiển ---
         toggleButton.addEventListener('click', () => {
             panel.classList.toggle('collapsed');
-            toggleButton.innerHTML = panel.classList.contains('collapsed') ? '►' : '▼'; // Change arrow
+            toggleButton.innerHTML = panel.classList.contains('collapsed') ? '►' : '▼'; // Thay đổi mũi tên
         });
 
 
         document.body.appendChild(panel);
     }
 
-    // --- API Hooking for Data Collection ---
+    // --- Móc API để thu thập dữ liệu ---
     ajaxHooker.hook(request => {
-        // Intercept responses to collect subtitle and image data
+        // Chặn các phản hồi để thu thập dữ liệu phụ đề và hình ảnh
         request.response = res => {
             if (res.responseText) {
                 try {
                     const data = JSON.parse(res.responseText);
+                    let apiImageUrlsFromResponse = []; // Tạm thời lưu trữ URL ảnh từ phản hồi API này
 
-                    // Case 1: dramaSetDetail (detail of a specific episode) - e.g., kilamanbo.com/web_manbo/dramaSetDetail
-                    // The main 'data' object itself is the episode data
+                    // Case 1: dramaSetDetail (chi tiết của một tập cụ thể) - ví dụ: kilamanbo.com/web_manbo/dramaSetDetail
                     if (request.url.includes('dramaSetDetail')) {
                         const episodeData = data?.data;
                         if (episodeData) {
                             currentEpisodeLrcUrl = episodeData.setLrcUrl || null;
                             currentEpisodeTitle = episodeData.setTitle || episodeData.setName || 'Tập hiện tại';
-                            // Get overall drama title from nested radioDramaResp
                             currentDramaTitle = episodeData.radioDramaResp?.title || currentDramaTitle;
 
-                            // Update subtitleData with all episodes from setRespList (from the nested radioDramaResp)
                             const setList = episodeData.radioDramaResp?.setRespList || [];
                             subtitleData = setList.map(a => [a.subTitle || a.setTitle || a.setName, a.setLrcUrl, a.setIdStr]);
 
-                            // Populate allDramaImageData from setPic of each episode and drama cover
                             const uniqueAllImages = new Set();
                             setList.forEach(ep => {
                                 if (ep.setPic) {
@@ -771,29 +768,25 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                             }
                             allDramaImageData = Array.from(uniqueAllImages);
 
-                            // Update current episode images from `picUrlSet` or `backgroundImgUrl` in the top-level episodeData
-                            const apiImageUrls = episodeData.picUrlSet || [];
-                            if (episodeData.backgroundImgUrl) {
-                                apiImageUrls.push(episodeData.backgroundImgUrl);
+                            // Lấy ảnh từ `picUrlSet` hoặc `backgroundImgUrl` cho tập hiện tại
+                            if (episodeData.picUrlSet) {
+                                apiImageUrlsFromResponse.push(...episodeData.picUrlSet);
                             }
-                            updateCurrentEpisodeImageList(apiImageUrls.filter(Boolean).map(url => url.replace(/\?.*/, '')));
+                            if (episodeData.backgroundImgUrl) {
+                                apiImageUrlsFromResponse.push(episodeData.backgroundImgUrl);
+                            }
                         }
                     }
-                    // Case 2: dramaDetail (main drama page) - e.g., kilamanbo.com/manbo/pc/detail
+                    // Case 2: dramaDetail (trang drama chính) - ví dụ: kilamanbo.com/manbo/pc/detail
                     else if (request.url.includes('dramaDetail')) {
                         const radioDramaResp = data?.data?.radioDramaResp || data?.data;
                         const setList = radioDramaResp?.setRespList || [];
                         subtitleData = setList.map(a => [a.subTitle || a.setTitle || a.setName, a.setLrcUrl, a.setIdStr]);
                         currentDramaTitle = radioDramaResp?.title || 'Manbo';
 
-                        // For dramaDetail, we typically don't have a single "current episode" LRC/title directly
-                        // unless it implies the first episode or currently playing one.
-                        // We'll reset these for now, assuming user will navigate to a specific episode page for direct LRC.
-                        currentEpisodeLrcUrl = null; // No direct episode LRC on main drama page
-                        currentEpisodeTitle = 'Tập hiện tại'; // Reset to default
+                        currentEpisodeLrcUrl = null;
+                        currentEpisodeTitle = 'Tập hiện tại';
 
-
-                        // Populate allDramaImageData from setPic of each episode and drama cover
                         const uniqueAllImages = new Set();
                         setList.forEach(episode => {
                             if (episode.setPic) {
@@ -805,57 +798,65 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         }
                         allDramaImageData = Array.from(uniqueAllImages);
 
-                        // Also update current episode images if this response contains relevant image list for the current view
+                        // Lấy ảnh từ `backgroundImgList` cho trang drama chính
                         if (radioDramaResp?.backgroundImgList) {
-                            const apiImageUrls = radioDramaResp.backgroundImgList.map(i => i.backPic).filter(Boolean);
-                            updateCurrentEpisodeImageList(apiImageUrls);
-                        } else {
-                            // If no `backgroundImgList` in this response, just update from DOM
-                            updateCurrentEpisodeImageList([]);
+                            apiImageUrlsFromResponse.push(...radioDramaResp.backgroundImgList.map(i => i.backPic));
                         }
                     }
-                    // For any other general image API (e.g., getBackground if it exists separately)
-                    else if (data?.data?.backgroundImgList) {
-                         const apiImageUrls = data.data.backgroundImgList.map(i => i.backPic).filter(Boolean);
-                         updateCurrentEpisodeImageList(apiImageUrls);
+                    // Case 3: kilamanbo.com/web_manbo/getBackground - API riêng để lấy ảnh cho tập hiện tại
+                    else if (request.url.includes('web_manbo/getBackground') && data?.data?.backgroundImgList) {
+                        apiImageUrlsFromResponse.push(...data.data.backgroundImgList.map(i => i.backPic));
+                        console.log("Đã phát hiện ảnh từ getBackground:", apiImageUrlsFromResponse);
                     }
 
-                    console.log("Current Drama Title:", currentDramaTitle);
-                    console.log("Current Episode Title:", currentEpisodeTitle);
-                    console.log("Current Episode LRC URL:", currentEpisodeLrcUrl);
-                    console.log("Subtitle Data (All Episodes):", subtitleData);
-                    console.log("All Drama Image Data:", allDramaImageData);
+                    // Sau khi xử lý tất cả các loại phản hồi API, cập nhật danh sách ảnh của tập hiện tại
+                    // Chỉ thêm các URL hợp lệ và loại bỏ các tham số truy vấn
+                    const cleanApiUrls = apiImageUrlsFromResponse.filter(Boolean).map(url => url.replace(/\?.*/, ''));
+                    if (cleanApiUrls.length > 0) {
+                        updateCurrentEpisodeImageList(cleanApiUrls);
+                    }
+
+                    console.log("Tiêu đề Drama hiện tại:", currentDramaTitle);
+                    console.log("Tiêu đề tập hiện tại:", currentEpisodeTitle);
+                    console.log("URL LRC tập hiện tại:", currentEpisodeLrcUrl);
+                    console.log("Dữ liệu phụ đề (Tất cả các tập):", subtitleData);
+                    console.log("Dữ liệu ảnh toàn bộ Drama:", allDramaImageData);
 
                 } catch (e) {
-                    console.error("Manbo Downloader: Error parsing JSON or extracting data:", e);
+                    console.error("Manbo Downloader: Lỗi phân tích JSON hoặc trích xuất dữ liệu:", e);
                 }
             }
         };
     });
 
-    // --- Initial setup ---
+    // --- Thiết lập ban đầu ---
     document.addEventListener('DOMContentLoaded', () => {
-        // Create the panel once DOM is ready
+        // Tạo bảng điều khiển khi DOM đã sẵn sàng
         createDownloaderPanel();
 
-        // Perform initial image list update for the current episode after DOM is ready
+        // Thực hiện cập nhật danh sách ảnh ban đầu cho tập hiện tại sau khi DOM sẵn sàng
+        // Điều này sẽ thu thập các ảnh từ DOM khi trang vừa tải.
         updateCurrentEpisodeImageList();
 
-        // Set up a MutationObserver to catch dynamically loaded images for the current episode
+        // Thiết lập MutationObserver để bắt các ảnh được tải động cho tập hiện tại
         const observer = new MutationObserver((mutationsList, observer) => {
             for (const mutation of mutationsList) {
+                // Kiểm tra xem có node mới nào được thêm vào DOM không
                 if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-                    // Re-run updateCurrentEpisodeImageList to capture new DOM images
+                    // Nếu có, chạy lại updateCurrentEpisodeImageList để nắm bắt các ảnh DOM mới
+                    // và đảm bảo các ảnh từ API (nếu đã được thêm vào `imageData` trước đó) vẫn còn.
                     updateCurrentEpisodeImageList();
                 }
             }
         });
 
-        // Observe the body for changes (e.g., new elements being added)
+        // Quan sát body để tìm các thay đổi (ví dụ: các phần tử mới được thêm vào)
+        // Cần quan sát cả `subtree` để bắt các thay đổi sâu trong DOM.
         observer.observe(document.body, { childList: true, subtree: true });
 
-        // Fallback to capture any remaining images from DOM after a short delay
-        // This helps for elements that might load a bit later after initial DOM ready.
+        // Fallback để nắm bắt bất kỳ ảnh còn lại nào từ DOM sau một khoảng thời gian ngắn
+        // Điều này giúp ích cho các phần tử có thể tải muộn hơn một chút sau khi DOM sẵn sàng ban đầu,
+        // hoặc nếu một số API bị bỏ lỡ.
         setTimeout(() => {
             updateCurrentEpisodeImageList();
         }, 1500);
