@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Manbo Media Downloader (Cute Pink Panel Edition - Optimized Images)
 // @namespace    manbo.kilamanbo.media
-// @version      2.7 // Optimized image collection from setPic
+// @version      2.8 // Added current episode LRC download + refined data extraction based on JSON example
 // @description  Tải phụ đề và ảnh từ Manbo với giao diện cute hồng, trực quan và dễ sử dụng! Các tùy chọn tải xuống được đặt trong một bảng điều khiển nổi. Ảnh lấy từ API (setPic) và các phần tử DOM cụ thể.
 // @author       Thien Truong Dia Cuu
 // @match        https://kilamanbo.com/manbo/pc/detail*
@@ -29,10 +29,12 @@
     'use strict';
 
     let isDownloading = false;
-    let subtitleData = []; // To store subtitle info: [title, lrcUrl, setIdStr]
+    let subtitleData = []; // To store subtitle info: [title, lrcUrl, setIdStr] for ALL episodes
+    let currentEpisodeLrcUrl = null; // To store LRC URL of the currently viewed episode
     let imageData = [];    // To store image URLs (from current page API/DOM)
     let allDramaImageData = []; // To store ALL images from ALL episodes (from setPic)
     let currentDramaTitle = 'Manbo';
+    let currentEpisodeTitle = 'Tập hiện tại'; // Default title for current episode
 
     // --- Custom Styles for Cute Pink Panel Edition ---
     GM_addStyle(`
@@ -234,7 +236,7 @@
      * Fetches a file using GM_xmlhttpRequest.
      * @param {string} url - The URL of the file.
      * @param {string} [responseType='blob'] - The desired response type.
-     * @returns {Promise<Blob|string>} A Promise thatresolves with the response.
+     * @returns {Promise<Blob|string>} A Promise that resolves with the response.
      */
     const fetchFile = (url, responseType = 'blob') => new Promise((resolve, reject) => {
         if (!url) {
@@ -274,6 +276,19 @@
         isDownloading = false;
     };
 
+    /**
+     * Cleans up a string for use as a filename by removing invalid characters.
+     * @param {string} name - The original string.
+     * @returns {string} The cleaned string.
+     */
+    const sanitizeFilename = (name) => {
+        // Remove invalid characters for filenames
+        return name.replace(/[\/\\?%*:|"<>]/g, '_')
+                   .replace(/\s+/g, ' ') // Replace multiple spaces with a single space
+                   .trim(); // Trim leading/trailing spaces
+    };
+
+
     // --- Subtitle Downloader Logic ---
 
     /**
@@ -304,22 +319,45 @@
             });
 
             // Create CSV content
-            const CSVContent = "\ufeff文件名,下载链接\n" +
-                               subtitlesToDownload.map((s, i) => `${s[0]},${s[1]}`).join("\n") +
-                               `\n\n(C) ChatGPT Script by Ne\n打包时间：${new Date().toISOString()}`;
+            const CSVContent = "\ufeff文件名,下载 liên kết\n" +
+                               subtitlesToDownload.map((s, i) => `${sanitizeFilename(s[0])}.lrc,${s[1]}`).join("\n") +
+                               `\n\n(C) ChatGPT Script by Ne\nĐóng gói thời gian：${new Date().toISOString()}`;
             const CSVBlob = new zip.TextReader(CSVContent);
 
             // Add files to zip
             const addPromises = [
                 zipWriter.add("filelist.csv", CSVBlob),
                 ...subtitlesToDownload.map((s, i) =>
-                    zipWriter.add(`${s[0]}.lrc`, new zip.TextReader(subtitleBlobs[i])) // Add LRC as text reader
+                    zipWriter.add(`${sanitizeFilename(s[0])}.lrc`, new zip.TextReader(subtitleBlobs[i])) // Add LRC as text reader
                 )
             ];
 
-            await allProgress(addPromises, p => console.log(`Subtitles Zip Progress: ${p.toFixed(2)}%`));
+            // Show progress bar for zipping
+            const swalProgressBar = Swal.fire({
+                title: 'Đang đóng gói phụ đề...',
+                html: `0% hoàn thành<br><progress id="swal-zip-progress-subtitle" max="100" value="0"></progress>`,
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showConfirmButton: false,
+                willOpen: () => {
+                    Swal.showLoading();
+                }
+            });
 
-            downloadFile(await zipWriter.close(), `Manbo_Subtitles_${dramaTitle}.zip`);
+            await allProgress(addPromises, p => {
+                const progressBar = document.getElementById('swal-zip-progress-subtitle');
+                if (progressBar) {
+                    progressBar.value = p;
+                    Swal.update({
+                        html: `${p.toFixed(2)}% hoàn thành<br><progress id="swal-zip-progress-subtitle" max="100" value="${p}"></progress>`
+                    });
+                }
+            }).catch(e => {
+                throw new Error(`Lỗi khi thêm tệp phụ đề vào ZIP: ${e.message}`);
+            });
+            swalProgressBar.then(() => Swal.close()); // Close the progress bar
+
+            downloadFile(await zipWriter.close(), `Manbo_Subtitles_${sanitizeFilename(dramaTitle)}.zip`);
             toast.fire({ title: 'Tải phụ đề hoàn tất!', icon: 'success' });
 
         } catch (e) {
@@ -371,27 +409,6 @@
     }
 
     /**
-     * Collects all drama images from `setRespList`'s `setPic` properties.
-     * This runs once when the drama detail API is intercepted.
-     */
-    function collectAllDramaImagesFromSetPic() {
-        if (subtitleData.length === 0) return; // No set data available
-
-        const uniqueAllDramaImageUrls = new Set();
-        // Extract setPic from each episode in subtitleData (which comes from setRespList)
-        // episode structure: [title, lrcUrl, setIdStr]
-        // We need to access the original setPic from the full setRespList object
-        // For now, we rely on the ajaxHooker to populate allDramaImageData directly from setRespList
-        // if it were structured differently.
-        // Given the provided JSON, `setPic` is directly in the episode object.
-        // We just need to make sure `subtitleData` also contains `setPic` if we want to extract from it here.
-        // Let's modify the `ajaxHooker` to directly populate `allDramaImageData` from `setRespList` `setPic`.
-        // This function will be called by ajaxHooker directly upon receiving the dramaDetail response.
-        // So no need to iterate subtitleData again here.
-    }
-
-
-    /**
      * Starts the process of zipping and downloading images.
      * @param {string[]} list - Array of image URLs.
      * @param {string} fileNamePrefix - Prefix for the zip file name.
@@ -434,16 +451,19 @@
             });
 
             await allProgress(addPromises, p => {
-                document.getElementById('swal-zip-progress').value = p;
-                Swal.update({
-                    html: `${p.toFixed(2)}% hoàn thành<br><progress id="swal-zip-progress" max="100" value="${p}"></progress>`
-                });
+                const progressBar = document.getElementById('swal-zip-progress');
+                if (progressBar) {
+                    progressBar.value = p;
+                    Swal.update({
+                        html: `${p.toFixed(2)}% hoàn thành<br><progress id="swal-zip-progress" max="100" value="${p}"></progress>`
+                    });
+                }
             }).catch(e => {
                 throw new Error(`Lỗi khi thêm tệp vào ZIP: ${e.message}`);
             });
             swalProgressBar.then(() => Swal.close()); // Close the progress bar
 
-            downloadFile(await zipWriter.close(), `${fileNamePrefix}_Images.zip`);
+            downloadFile(await zipWriter.close(), `${sanitizeFilename(fileNamePrefix)}_Images.zip`);
             toast.fire({ title: 'Tải ảnh hoàn tất!', icon: 'success' });
 
         } catch (e) {
@@ -488,18 +508,46 @@
         // --- Subtitle Section ---
         const subtitleSectionTitle = document.createElement('div');
         subtitleSectionTitle.classList.add('panel-section-title');
-        subtitleSectionTitle.innerHTML = '<i>🐾</i> Tải TOÀN BỘ Drama (ZIP):'; // Icon changed to paws
+        subtitleSectionTitle.innerHTML = '<i>🐾</i> Tải phụ đề:'; // Icon changed to paws
         panelBody.appendChild(subtitleSectionTitle);
 
         // Phụ đề LRC (Download all) - Assuming Lrc is the primary subtitle type for Manbo
         const btnDownloadAllLRC = document.createElement('button');
         btnDownloadAllLRC.classList.add('download-option-btn');
-        btnDownloadAllLRC.innerHTML = '<i></i> Tải xuống phụ đề LRC';
+        btnDownloadAllLRC.innerHTML = '<i></i> Tải phụ đề LRC (Toàn bộ Drama)';
         btnDownloadAllLRC.querySelector('i').classList.add('icon-json-srt'); // Reusing icon for generic subtitle download
         panelBody.appendChild(btnDownloadAllLRC);
         btnDownloadAllLRC.onclick = () => {
-            if (subtitleData.length === 0) return Swal.fire('Không có dữ liệu phụ đề', 'Bạn đã vào trang chi tiết tập chưa?', 'error');
+            if (subtitleData.length === 0) return Swal.fire('Không có dữ liệu phụ đề', 'Bạn đã vào trang chi tiết drama chính chưa?', 'error');
             startZipSubtitles(subtitleData, currentDramaTitle);
+        };
+
+        // Tải phụ đề LRC tập hiện tại
+        const btnDownloadCurrentEpisodeLRC = document.createElement('button');
+        btnDownloadCurrentEpisodeLRC.classList.add('download-option-btn');
+        btnDownloadCurrentEpisodeLRC.innerHTML = '<i></i> Tải phụ đề LRC (Tập hiện tại)';
+        btnDownloadCurrentEpisodeLRC.querySelector('i').classList.add('icon-lrc'); // Using icon-lrc for single subtitle
+        panelBody.appendChild(btnDownloadCurrentEpisodeLRC);
+        btnDownloadCurrentEpisodeLRC.onclick = async () => {
+            if (isDownloading) {
+                return toast.fire({ title: 'Đang tải về, vui lòng chờ...', icon: 'warning' });
+            }
+            if (!currentEpisodeLrcUrl) {
+                return Swal.fire('Không tìm thấy phụ đề LRC', 'Hãy đảm bảo bạn đang ở trang chi tiết của một tập và phụ đề đã tải.', 'error');
+            }
+            isDownloading = true;
+            toast.fire({ title: 'Đang tải phụ đề LRC tập hiện tại...', icon: 'info' });
+            try {
+                const lrcText = await fetchFile(currentEpisodeLrcUrl, 'text');
+                // Use currentEpisodeTitle for the filename if available, fallback to a generic name
+                const filename = `${sanitizeFilename(currentDramaTitle)}_${sanitizeFilename(currentEpisodeTitle)}.lrc`;
+                downloadFile(new Blob([lrcText], { type: 'text/plain;charset=utf-8' }), filename);
+                toast.fire({ title: 'Tải phụ đề LRC tập hiện tại hoàn tất!', icon: 'success' });
+            } catch (e) {
+                toast.fire({ title: 'Lỗi khi tải phụ đề LRC tập hiện tại.', icon: 'error', text: e.message });
+            } finally {
+                isDownloading = false;
+            }
         };
 
 
@@ -519,7 +567,7 @@
         btnDownloadCurrentEpisodeImages.onclick = () => {
             updateCurrentEpisodeImageList(); // Scrape DOM images one more time right before action
             if (imageData.length === 0) return Swal.fire('Không tìm thấy ảnh', 'Hãy cuộn trang hoặc chờ tải API để có thêm ảnh.', 'error');
-            startZipImages(imageData, `${currentDramaTitle}_Episode`);
+            startZipImages(imageData, `${sanitizeFilename(currentDramaTitle)}_${sanitizeFilename(currentEpisodeTitle)}`);
         };
 
         // Tải TẤT CẢ ảnh Drama (toàn bộ các tập)
@@ -530,7 +578,7 @@
         panelBody.appendChild(btnDownloadAllDramaImages);
         btnDownloadAllDramaImages.onclick = () => {
             if (allDramaImageData.length === 0) return Swal.fire('Không tìm thấy ảnh', 'Chưa có dữ liệu ảnh cho toàn bộ drama. Hãy đảm bảo bạn đã vào trang chi tiết drama chính.', 'warning');
-            startZipImages(allDramaImageData, `${currentDramaTitle}_All_Drama`);
+            startZipImages(allDramaImageData, `${sanitizeFilename(currentDramaTitle)}_All_Drama`);
         };
 
 
@@ -552,35 +600,66 @@
                 try {
                     const data = JSON.parse(res.responseText);
 
-                    // Subtitle data and All Drama Images extraction
-                    // This covers dramaDetail API (which contains setRespList)
-                    if (request.url.includes('dramaSetDetail') || request.url.includes('dramaDetail')) {
+                    // Case 1: dramaSetDetail (detail of a specific episode)
+                    // The main 'data' object itself is the episode data
+                    if (request.url.includes('dramaSetDetail')) {
+                        const episodeData = data?.data;
+                        if (episodeData) {
+                            currentEpisodeLrcUrl = episodeData.setLrcUrl || null;
+                            currentEpisodeTitle = episodeData.setTitle || episodeData.setName || 'Tập hiện tại';
+                            // Get overall drama title from nested radioDramaResp
+                            currentDramaTitle = episodeData.radioDramaResp?.title || currentDramaTitle;
+
+                            // Update subtitleData with all episodes from setRespList
+                            const setList = episodeData.radioDramaResp?.setRespList || [];
+                            subtitleData = setList.map(a => [a.subTitle || a.setTitle || a.setName, a.setLrcUrl, a.setIdStr]);
+
+                            // Populate allDramaImageData from setPic of each episode and drama cover
+                            const uniqueAllImages = new Set();
+                            setList.forEach(ep => {
+                                if (ep.setPic) {
+                                    uniqueAllImages.add(ep.setPic.replace(/\?.*/, ''));
+                                }
+                            });
+                            if (episodeData.radioDramaResp?.coverPic) {
+                                uniqueAllImages.add(episodeData.radioDramaResp.coverPic.replace(/\?.*/, ''));
+                            }
+                            allDramaImageData = Array.from(uniqueAllImages);
+
+                            // Update current episode images if `picUrlSet` or `backgroundImgUrl` exists in the top-level episodeData
+                            const apiImageUrls = episodeData.picUrlSet || [];
+                            if (episodeData.backgroundImgUrl) {
+                                apiImageUrls.push(episodeData.backgroundImgUrl);
+                            }
+                            updateCurrentEpisodeImageList(apiImageUrls.filter(Boolean).map(url => url.replace(/\?.*/, '')));
+                        }
+                    }
+                    // Case 2: dramaDetail (main drama page, which contains setRespList)
+                    else if (request.url.includes('dramaDetail')) {
                         const radioDramaResp = data?.data?.radioDramaResp || data?.data;
                         const setList = radioDramaResp?.setRespList || [];
-                        subtitleData = setList.map(a => [a.subTitle || a.setTitle, a.setLrcUrl, a.setIdStr]);
+                        subtitleData = setList.map(a => [a.subTitle || a.setTitle || a.setName, a.setLrcUrl, a.setIdStr]);
                         currentDramaTitle = radioDramaResp?.title || 'Manbo';
 
-                        // Populate allDramaImageData from setPic of each episode
+                        // For dramaDetail, we typically don't have a single "current episode" LRC/title directly
+                        // unless it implies the first episode or currently playing one.
+                        // We'll reset these for now, assuming user will navigate to a specific episode page.
+                        currentEpisodeLrcUrl = null;
+                        currentEpisodeTitle = 'Tập hiện tại'; // Reset to default
+
+                        // Populate allDramaImageData from setPic of each episode and drama cover
                         const uniqueAllImages = new Set();
                         setList.forEach(episode => {
                             if (episode.setPic) {
                                 uniqueAllImages.add(episode.setPic.replace(/\?.*/, ''));
                             }
                         });
-                        // Also try to get the main coverPic of the drama
                         if (radioDramaResp?.coverPic) {
                             uniqueAllImages.add(radioDramaResp.coverPic.replace(/\?.*/, ''));
                         }
                         allDramaImageData = Array.from(uniqueAllImages);
 
-                        console.log("Subtitle Data Collected:", subtitleData);
-                        console.log("All Drama Image Data (from setPic & coverPic):", allDramaImageData);
-                        console.log("Drama Title:", currentDramaTitle);
-
-                        // Also update current episode images if this is a detail page for a specific episode
-                        // If `backgroundImgList` exists for the current episode's detailed API response, use it.
-                        // The provided JSON example does NOT have `backgroundImgList` at this level,
-                        // but it might exist in other specific episode detail APIs.
+                        // Also update current episode images if this response contains relevant image list for the current view
                         if (radioDramaResp?.backgroundImgList) {
                             const apiImageUrls = radioDramaResp.backgroundImgList.map(i => i.backPic).filter(Boolean);
                             updateCurrentEpisodeImageList(apiImageUrls);
@@ -590,10 +669,17 @@
                         }
                     }
                     // For any other general image API (e.g., getBackground if it exists separately)
-                    else if (data?.data?.backgroundImgList && !request.url.includes('dramaSetDetail') && !request.url.includes('dramaDetail')) {
+                    else if (data?.data?.backgroundImgList) {
                          const apiImageUrls = data.data.backgroundImgList.map(i => i.backPic).filter(Boolean);
                          updateCurrentEpisodeImageList(apiImageUrls);
                     }
+
+                    console.log("Current Drama Title:", currentDramaTitle);
+                    console.log("Current Episode Title:", currentEpisodeTitle);
+                    console.log("Current Episode LRC URL:", currentEpisodeLrcUrl);
+                    console.log("Subtitle Data (All Episodes):", subtitleData);
+                    console.log("All Drama Image Data:", allDramaImageData);
+
                 } catch (e) {
                     console.error("Manbo Downloader: Error parsing JSON or extracting data:", e);
                 }
@@ -623,6 +709,7 @@
         observer.observe(document.body, { childList: true, subtree: true });
 
         // Fallback to capture any remaining images from DOM after a short delay
+        // This helps for elements that might load a bit later after initial DOM ready.
         setTimeout(() => {
             updateCurrentEpisodeImageList();
         }, 1500);
