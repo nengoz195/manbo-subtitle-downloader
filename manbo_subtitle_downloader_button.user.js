@@ -1,4 +1,6 @@
 // ==UserScript==
+// @updateURL    https://raw.githubusercontent.com/nengoz195/manbo-subtitle-image-downloader/refs/heads/main/manbo_subtitle_downloader_button.user.js
+// @downloadURL  https://raw.githubusercontent.com/nengoz195/manbo-subtitle-image-downloader/refs/heads/main/manbo_subtitle_downloader_button.user.js
 // @name         Manbo Media Downloader (Cute Pink Panel Edition - Optimized Images)
 // @namespace    manbo.kilamanbo.media
 // @version      3.2 // Chuyển đổi ASS - không dòng trống
