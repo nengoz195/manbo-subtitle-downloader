@@ -3,7 +3,7 @@
 // @downloadURL  https://raw.githubusercontent.com/nengoz195/manbo-subtitle-image-downloader/refs/heads/main/manbo_subtitle_downloader_button.user.js
 // @name         Manbo Media Downloader (Cute Pink Panel Edition - Optimized Images)
 // @namespace    manbo.kilamanbo.media
-// @version      3.2 // Chuyển đổi ASS - không dòng trống
+// @version      3.2.1 // Chuyển đổi ASS - không dòng trống + Sửa lỗi trùng tên tệp ZIP
 // @description  Tải phụ đề và ảnh từ Manbo với giao diện cute hồng, trực quan và dễ sử dụng! Các tùy chọn tải xuống được đặt trong một bảng điều khiển nổi. Ảnh lấy từ API (setPic) và các phần tử DOM cụ thể.
 // @author       Thien Truong Dia Cuu
 // @match        https://kilamanbo.com/manbo/pc/detail*
@@ -450,25 +450,46 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 throw new Error(`Lỗi tải phụ đề: ${e.message}`);
             });
 
-            // Chuyển đổi văn bản nếu targetFormat là ASS
-            const processedSubtitles = subtitleTexts.map((text, i) => {
+            const processedSubtitles = [];
+            const filenameSet = new Set(); // Dùng để theo dõi tên tệp đã sử dụng
+
+            subtitleTexts.forEach((text, i) => {
                 const originalTitle = subtitlesToDownload[i][0];
+                const setId = subtitlesToDownload[i][2]; // Lấy setIdStr
                 const originalUrl = subtitlesToDownload[i][1];
+
                 let processedText = text;
                 if (targetFormat === 'ass') {
                     processedText = convertLrcToAss(text);
                 }
-                return {
-                    title: originalTitle,
+
+                // Tạo tên tệp duy nhất bằng cách kết hợp tên đã làm sạch và setId
+                // Ví dụ: "TenTap_setId.lrc" hoặc "TenTap_setId.ass"
+                let baseFilename = sanitizeFilename(originalTitle);
+                let uniqueFilename = `${baseFilename}_${setId}.${targetFormat}`;
+
+                // Nếu tên tệp đã tồn tại (mặc dù đã thêm setId, vẫn có thể xảy ra nếu setIdStr có trùng lặp hoặc rất ngắn),
+                // thêm một hậu tố số. Mặc dù khả năng này thấp với setIdStr, nhưng tốt hơn là có.
+                let counter = 1;
+                let finalFilename = uniqueFilename;
+                while (filenameSet.has(finalFilename)) {
+                    finalFilename = `${baseFilename}_${setId}_${counter}.${targetFormat}`;
+                    counter++;
+                }
+                filenameSet.add(finalFilename);
+
+                processedSubtitles.push({
+                    title: originalTitle, // Tên gốc để hiển thị
                     url: originalUrl,
                     content: processedText,
-                    format: targetFormat
-                };
+                    format: targetFormat,
+                    filenameInZip: finalFilename // Tên tệp sẽ được sử dụng trong ZIP
+                });
             });
 
             // Tạo nội dung CSV
             const CSVContent = "\ufeff文件名,tải xuống liên kết\n" +
-                               processedSubtitles.map(s => `${sanitizeFilename(s.title)}.${s.format},${s.url}`).join("\n") +
+                               processedSubtitles.map(s => `${s.filenameInZip},${s.url}`).join("\n") + // Sử dụng filenameInZip
                                `\n\n(C) ChatGPT Script by Ne\nĐóng gói thời gian：${new Date().toISOString()}`;
             const CSVBlob = new zip.TextReader(CSVContent);
 
@@ -476,7 +497,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             const addPromises = [
                 zipWriter.add("filelist.csv", CSVBlob),
                 ...processedSubtitles.map(s =>
-                    zipWriter.add(`${sanitizeFilename(s.title)}.${s.format}`, new zip.TextReader(s.content))
+                    zipWriter.add(s.filenameInZip, new zip.TextReader(s.content)) // Sử dụng filenameInZip
                 )
             ];
 
@@ -583,10 +604,28 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 throw new Error(`Lỗi tải ảnh: ${e.message}`);
             });
 
-            const addPromises = list.map((url, i) => {
+            // Sử dụng Set để đảm bảo tên tệp duy nhất trong ZIP
+            const addedFilenames = new Set();
+            const addPromises = [];
+
+            list.forEach((url, i) => {
                 const parts = url.split('/');
-                const filename = parts[parts.length - 1].split('?')[0]; // Lấy tên tệp và loại bỏ các tham số truy vấn
-                return zipWriter.add(filename, new zip.BlobReader(imageBlobs[i]));
+                const originalFilename = parts[parts.length - 1].split('?')[0]; // Lấy tên tệp và loại bỏ các tham số truy vấn
+                let filename = originalFilename;
+                let counter = 1;
+
+                // Tạo tên tệp duy nhất nếu tên gốc đã tồn tại
+                while (addedFilenames.has(filename)) {
+                    const extIndex = originalFilename.lastIndexOf('.');
+                    if (extIndex > -1) {
+                        filename = `${originalFilename.substring(0, extIndex)}_${counter}${originalFilename.substring(extIndex)}`;
+                    } else {
+                        filename = `${originalFilename}_${counter}`;
+                    }
+                    counter++;
+                }
+                addedFilenames.add(filename);
+                addPromises.push(zipWriter.add(filename, new zip.BlobReader(imageBlobs[i])));
             });
 
             const swalProgressBar = Swal.fire({
@@ -733,7 +772,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             toast.fire({ title: 'Đang tải phụ đề LRC tập hiện tại...', icon: 'info' });
             try {
                 const lrcText = await fetchFile(currentEpisodeLrcUrl, 'text');
-                // Sử dụng currentEpisodeTitle cho tên tệp nếu có, nếu không thì dùng tên chung
+                // Sử dụng currentEpisodeTitle và DramaTitle để tạo tên tệp duy nhất và rõ ràng
                 const filename = `${sanitizeFilename(currentDramaTitle)}_${sanitizeFilename(currentEpisodeTitle)}.lrc`;
                 downloadFile(new Blob([lrcText], { type: 'text/plain;charset=utf-8' }), filename);
                 toast.fire({ title: 'Tải phụ đề LRC tập hiện tại hoàn tất!', icon: 'success' });
@@ -849,6 +888,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                             currentDramaTitle = episodeData.radioDramaResp?.title || currentDramaTitle;
 
                             const setList = episodeData.radioDramaResp?.setRespList || [];
+                            // subtitleData: [tiêu đề, lrcUrl, setIdStr]
                             subtitleData = setList.map(a => [a.subTitle || a.setTitle || a.setName, a.setLrcUrl, a.setIdStr]);
 
                             const uniqueAllImages = new Set();
@@ -875,6 +915,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     else if (request.url.includes('dramaDetail')) {
                         const radioDramaResp = data?.data?.radioDramaResp || data?.data;
                         const setList = radioDramaResp?.setRespList || [];
+                        // subtitleData: [tiêu đề, lrcUrl, setIdStr]
                         subtitleData = setList.map(a => [a.subTitle || a.setTitle || a.setName, a.setLrcUrl, a.setIdStr]);
                         currentDramaTitle = radioDramaResp?.title || 'Manbo';
 
