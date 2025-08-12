@@ -58,16 +58,7 @@
             overflow: hidden; /* Ẩn tràn tổng thể nếu nội dung vẫn quá dài */
             display: flex; /* Dùng flexbox để footer dính dưới cùng */
             flex-direction: column;
-            transition: all 0.3s ease-in-out; /* Thêm transition cho panel */
         }
-
-        /* Khi panel bị ẩn hoàn toàn */
-        #manbo-downloader-panel.collapsed {
-            right: -300px; /* Đẩy ra ngoài màn hình */
-            opacity: 0;
-            pointer-events: none; /* Vô hiệu hóa tương tác khi ẩn */
-        }
-
 
         /* Tiêu đề bảng điều khiển */
         #manbo-downloader-panel .panel-header {
@@ -102,7 +93,7 @@
             transform: rotate(-90deg);
         }
 
-        /* Thân bảng điều khiển (có thể thu gọn nội dung) */
+        /* Thân bảng điều khiển (có thể thu gọn) */
         #manbo-downloader-panel .panel-body {
             /* max-height được tính toán bằng JS */
             overflow-y: auto; /* Cuộn nếu nội dung tràn */
@@ -110,10 +101,10 @@
             opacity: 1;
             flex-grow: 1; /* Cho phép body mở rộng và chiếm không gian còn lại */
         }
-        #manbo-downloader-panel .panel-body.collapsed { /* Cập nhật: Chỉ áp dụng cho .panel-body */
-            max-height: 0 !important;
+        #manbo-downloader-panel.collapsed .panel-body {
+            max-height: 0 !important; /* Quan trọng: Ghi đè max-height từ JS */
             opacity: 0;
-            overflow: hidden;
+            overflow: hidden; /* Ẩn tràn khi thu gọn */
         }
 
         /* Tiêu đề phần */
@@ -162,38 +153,14 @@
         }
         /* Kiểu biểu tượng (sử dụng ký tự unicode cho đơn giản, có thể sử dụng hình ảnh/svg thực tế nếu muốn) */
         .icon-lrc:before { content: '💬'; }
-        .icon-json-srt:before { content: '📄'; }
-        .icon-ass:before { content: '📝'; }
+        .icon-json-srt:before { content: '📄'; } /* Thay đổi từ tài liệu sang giấy */
+        .icon-ass:before { content: '📝'; } /* Thay đổi từ tài liệu có bút */
         .icon-audio:before { content: '🎧'; }
         .icon-cover:before { content: '🖼️'; }
-        .icon-all-images:before { content: '🎀'; }
-        .icon-single-image:before { content: '📸'; }
+        .icon-all-images:before { content: '🎀'; } /* Ruy băng cho "Tất cả ảnh" */
+        .icon-single-image:before { content: '📸'; } /* Biểu tượng mới cho ảnh tập đơn */
 
-        /* Nút ẩn hiện chính */
-        #manbo-downloader-toggle-main-button {
-            position: fixed;
-            bottom: 20px; /* Vị trí dưới cùng */
-            right: 20px; /* Vị trí bên phải */
-            width: 40px; /* Nhỏ hơn một chút */
-            height: 40px; /* Nhỏ hơn một chút */
-            background: linear-gradient(135deg, #ff7eb9, #ff4d94); /* Màu hồng đậm */
-            color: white;
-            border: none;
-            border-radius: 50%; /* Hình tròn */
-            box-shadow: 0 4px 12px rgba(255, 77, 148, 0.4); /* Bóng nhỏ hơn một chút */
-            font-size: 1.5em; /* Kích thước biểu tượng nhỏ hơn */
-            font-weight: bold;
-            cursor: pointer;
-            z-index: 10000; /* Đảm bảo nổi trên mọi thứ */
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            transition: all 0.2s ease;
-        }
-        #manbo-downloader-toggle-main-button:hover {
-            background: linear-gradient(135deg, #ff4d94, #d63384);
-            transform: scale(1.08); /* Phóng to nhẹ hơn khi hover */
-        }
+
         /* Kiểu SweetAlert2 (chủ đề màu hồng nhất quán) */
         .swal2-popup {
             border-radius: 20px !important;
@@ -665,7 +632,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
         const panel = document.createElement('div');
         panel.id = 'manbo-downloader-panel';
-        document.body.appendChild(panel); // Thêm panel trước để nó có thể được điều khiển
 
         // Tiêu đề bảng điều khiển
         const panelHeader = document.createElement('div');
@@ -677,11 +643,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         panelTitle.innerHTML = '<span>💖</span> Manbo Downloader';
         panelHeader.appendChild(panelTitle);
 
-        // Nút toggle nội bộ panel (thu gọn/mở rộng nội dung)
-        const internalToggleButton = document.createElement('button');
-        internalToggleButton.classList.add('toggle-button');
-        internalToggleButton.innerHTML = '▼'; // Mũi tên xuống
-        panelHeader.appendChild(internalToggleButton);
+        const toggleButton = document.createElement('button');
+        toggleButton.classList.add('toggle-button');
+        toggleButton.innerHTML = '▼'; // Mũi tên xuống
+        panelHeader.appendChild(toggleButton);
 
         // Thân bảng điều khiển (nội dung có thể thu gọn)
         panelBodyElement = document.createElement('div'); // Gán vào biến toàn cục
@@ -804,30 +769,19 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         };
 
 
-        // --- Chức năng chuyển đổi bảng điều khiển nội bộ (thu gọn nội dung) ---
-        internalToggleButton.addEventListener('click', () => {
-            panelBodyElement.classList.toggle('collapsed'); // Chỉ thu gọn phần body
-            internalToggleButton.innerHTML = panelBodyElement.classList.contains('collapsed') ? '►' : '▼'; // Thay đổi mũi tên
-            // Không cần điều chỉnh chiều cao tổng thể của panel khi chỉ thu gọn nội dung bên trong
-        });
-
-        // Tạo nút ẩn/hiện chính (nút nổi ngoài cùng)
-        const mainToggleButton = document.createElement('button');
-        mainToggleButton.id = 'manbo-downloader-toggle-main-button';
-        mainToggleButton.innerHTML = '💖'; // Biểu tượng trái tim hoặc mũi tên
-        document.body.appendChild(mainToggleButton);
-
-        mainToggleButton.addEventListener('click', () => {
-            const panel = document.getElementById('manbo-downloader-panel');
-            const isPanelCollapsed = panel.classList.toggle('collapsed');
-            // Cập nhật biểu tượng nút chính
-            mainToggleButton.innerHTML = isPanelCollapsed ? '💖' : '❌'; // Ví dụ: hiện trái tim khi ẩn, X khi hiện
-            // Nếu panel được hiện lại, điều chỉnh chiều cao
-            if (!isPanelCollapsed) {
-                setTimeout(adjustPanelHeight, 300); // Đảm bảo transition CSS kết thúc
+        // --- Chức năng chuyển đổi bảng điều khiển ---
+        toggleButton.addEventListener('click', () => {
+            panel.classList.toggle('collapsed');
+            toggleButton.innerHTML = panel.classList.contains('collapsed') ? '►' : '▼'; // Thay đổi mũi tên
+            // Điều chỉnh chiều cao sau khi thay đổi trạng thái collapse để đảm bảo hiển thị đúng
+            if (!panel.classList.contains('collapsed')) {
+                // Cho phép transition CSS kết thúc trước khi điều chỉnh lại chiều cao
+                setTimeout(adjustPanelHeight, 300);
             }
         });
 
+
+        document.body.appendChild(panel);
         adjustPanelHeight(); // Điều chỉnh chiều cao ban đầu khi panel được tạo
     }
 
@@ -927,15 +881,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     document.addEventListener('DOMContentLoaded', () => {
         // Tạo bảng điều khiển khi DOM đã sẵn sàng
         createDownloaderPanel();
-
-        // Đảm bảo nút ẩn hiện chính được tạo và panel ẩn đi ban đầu
-        const mainToggleButton = document.getElementById('manbo-downloader-toggle-main-button');
-        const panel = document.getElementById('manbo-downloader-panel');
-        if (panel && mainToggleButton) {
-            // Ẩn panel ban đầu và cập nhật biểu tượng nút
-            panel.classList.add('collapsed');
-            mainToggleButton.innerHTML = '💖'; // Biểu tượng ban đầu khi ẩn
-        }
 
         // Thực hiện cập nhật danh sách ảnh ban đầu cho tập hiện tại sau khi DOM sẵn sàng
         // Điều này sẽ thu thập các ảnh từ DOM khi trang vừa tải.
