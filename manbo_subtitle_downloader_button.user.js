@@ -54,6 +54,10 @@
             padding: 15px;
             box-sizing: border-box; /* Bao gồm phần đệm trong chiều rộng */
             border: 1px solid #ffb3d9; /* Viền tinh tế */
+            max-height: 90vh; /* Giới hạn chiều cao tổng thể của panel theo viewport height */
+            overflow: hidden; /* Ẩn tràn tổng thể nếu nội dung vẫn quá dài */
+            display: flex; /* Dùng flexbox để footer dính dưới cùng */
+            flex-direction: column;
         }
 
         /* Tiêu đề bảng điều khiển */
@@ -64,6 +68,7 @@
             margin-bottom: 15px;
             padding-bottom: 10px;
             border-bottom: 1px dashed #ffb3d9; /* Đường gạch ngang */
+            flex-shrink: 0; /* Không cho header co lại */
         }
         #manbo-downloader-panel .panel-title {
             color: #ff4d94;
@@ -90,13 +95,14 @@
 
         /* Thân bảng điều khiển (có thể thu gọn) */
         #manbo-downloader-panel .panel-body {
-            max-height: 500px; /* Chiều cao tối đa trước khi cuộn */
+            /* max-height được tính toán bằng JS */
             overflow-y: auto; /* Cuộn nếu nội dung tràn */
             transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
             opacity: 1;
+            flex-grow: 1; /* Cho phép body mở rộng và chiếm không gian còn lại */
         }
         #manbo-downloader-panel.collapsed .panel-body {
-            max-height: 0;
+            max-height: 0 !important; /* Quan trọng: Ghi đè max-height từ JS */
             opacity: 0;
             overflow: hidden; /* Ẩn tràn khi thu gọn */
         }
@@ -324,10 +330,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 const milliseconds = parseInt(match[3]) * (match[3].length === 2 ? 10 : 1);
                 const text = match[4].trim(); // Lấy phần văn bản và cắt bỏ khoảng trắng
 
-                parsedLines.push({
-                    time: minutes * 60000 + seconds * 1000 + milliseconds, // Tổng số mili giây
-                    text: text
-                });
+                // Chỉ thêm vào nếu có văn bản thực sự sau dấu thời gian
+                if (text.length > 0) {
+                    parsedLines.push({
+                        time: minutes * 60000 + seconds * 1000 + milliseconds, // Tổng số mili giây
+                        text: text
+                    });
+                }
             }
         });
 
@@ -582,6 +591,37 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
     // --- Tạo bảng điều khiển UI ---
 
+    let panelBodyElement = null; // Biến toàn cục để lưu trữ phần tử panel-body
+
+    /**
+     * Điều chỉnh chiều cao tối đa của panel-body dựa trên chiều cao cửa sổ.
+     */
+    function adjustPanelHeight() {
+        if (!panelBodyElement) return;
+
+        // Lấy tham chiếu đến panel chính và header
+        const panel = document.getElementById('manbo-downloader-panel');
+        const header = panel.querySelector('.panel-header');
+
+        if (!panel || !header) return;
+
+        // Tính toán khoảng trống còn lại cho body
+        // 20px * 2 là top/bottom: 20% + 20px (panel top) + 20px (panel bottom)
+        const panelVerticalPadding = 30; // 15px top + 15px bottom padding của panel
+        const headerHeight = header.offsetHeight;
+        const panelTopOffset = panel.offsetTop;
+        const windowHeight = window.innerHeight;
+
+        // Chiều cao tối đa khả dụng cho toàn bộ panel, trừ đi một biên an toàn (ví dụ: 20px)
+        const availableHeightForPanel = windowHeight - panelTopOffset - 20;
+
+        // Chiều cao tối đa cho panelBodyElement
+        // Lấy chiều cao tối đa của panel, trừ đi chiều cao header và padding
+        const maxBodyHeight = availableHeightForPanel - headerHeight - panelVerticalPadding;
+
+        panelBodyElement.style.maxHeight = `${Math.max(100, maxBodyHeight)}px`; // Đảm bảo tối thiểu 100px
+    }
+
     /**
      * Tạo và thêm bảng điều khiển tải xuống chính vào trang.
      */
@@ -609,22 +649,22 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         panelHeader.appendChild(toggleButton);
 
         // Thân bảng điều khiển (nội dung có thể thu gọn)
-        const panelBody = document.createElement('div');
-        panelBody.classList.add('panel-body');
-        panel.appendChild(panelBody);
+        panelBodyElement = document.createElement('div'); // Gán vào biến toàn cục
+        panelBodyElement.classList.add('panel-body');
+        panel.appendChild(panelBodyElement);
 
         // --- Phần phụ đề ---
         const subtitleSectionTitle = document.createElement('div');
         subtitleSectionTitle.classList.add('panel-section-title');
         subtitleSectionTitle.innerHTML = '<i>🐾</i> Tải phụ đề:'; // Biểu tượng đổi thành dấu chân
-        panelBody.appendChild(subtitleSectionTitle);
+        panelBodyElement.appendChild(subtitleSectionTitle);
 
         // Phụ đề LRC (Tải tất cả) - Giả sử Lrc là loại phụ đề chính cho Manbo
         const btnDownloadAllLRC = document.createElement('button');
         btnDownloadAllLRC.classList.add('download-option-btn');
         btnDownloadAllLRC.innerHTML = '<i></i> Tải phụ đề LRC (Toàn bộ Drama)';
         btnDownloadAllLRC.querySelector('i').classList.add('icon-json-srt'); // Tái sử dụng biểu tượng cho tải phụ đề chung
-        panelBody.appendChild(btnDownloadAllLRC);
+        panelBodyElement.appendChild(btnDownloadAllLRC);
         btnDownloadAllLRC.onclick = () => {
             if (subtitleData.length === 0) return Swal.fire('Không có dữ liệu phụ đề', 'Bạn đã vào trang chi tiết drama chính chưa?', 'error');
             startZipSubtitles(subtitleData, currentDramaTitle, 'lrc');
@@ -635,7 +675,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         btnDownloadAllASS.classList.add('download-option-btn');
         btnDownloadAllASS.innerHTML = '<i></i> Tải phụ đề ASS (Toàn bộ Drama)';
         btnDownloadAllASS.querySelector('i').classList.add('icon-ass'); // Sử dụng icon-ass
-        panelBody.appendChild(btnDownloadAllASS);
+        panelBodyElement.appendChild(btnDownloadAllASS);
         btnDownloadAllASS.onclick = () => {
             if (subtitleData.length === 0) return Swal.fire('Không có dữ liệu phụ đề', 'Bạn đã vào trang chi tiết drama chính chưa?', 'error');
             startZipSubtitles(subtitleData, currentDramaTitle, 'ass');
@@ -646,7 +686,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         btnDownloadCurrentEpisodeLRC.classList.add('download-option-btn');
         btnDownloadCurrentEpisodeLRC.innerHTML = '<i></i> Tải phụ đề LRC (Tập hiện tại)';
         btnDownloadCurrentEpisodeLRC.querySelector('i').classList.add('icon-lrc'); // Sử dụng icon-lrc cho phụ đề đơn
-        panelBody.appendChild(btnDownloadCurrentEpisodeLRC);
+        panelBodyElement.appendChild(btnDownloadCurrentEpisodeLRC);
         btnDownloadCurrentEpisodeLRC.onclick = async () => {
             if (isDownloading) {
                 return toast.fire({ title: 'Đang tải về, vui lòng chờ...', icon: 'warning' });
@@ -674,7 +714,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         btnDownloadCurrentEpisodeASS.classList.add('download-option-btn');
         btnDownloadCurrentEpisodeASS.innerHTML = '<i></i> Tải phụ đề ASS (Tập hiện tại)';
         btnDownloadCurrentEpisodeASS.querySelector('i').classList.add('icon-ass'); // Sử dụng icon-ass
-        panelBody.appendChild(btnDownloadCurrentEpisodeASS);
+        panelBodyElement.appendChild(btnDownloadCurrentEpisodeASS);
         btnDownloadCurrentEpisodeASS.onclick = async () => {
             if (isDownloading) {
                 return toast.fire({ title: 'Đang tải về, vui lòng chờ...', icon: 'warning' });
@@ -703,14 +743,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         imageSectionTitle.classList.add('panel-section-title');
         imageSectionTitle.innerHTML = '<i></i> Tải ảnh Drama:';
         imageSectionTitle.querySelector('i').classList.add('icon-all-images');
-        panelBody.appendChild(imageSectionTitle);
+        panelBodyElement.appendChild(imageSectionTitle);
 
         // Tải ảnh tập hiện tại
         const btnDownloadCurrentEpisodeImages = document.createElement('button');
         btnDownloadCurrentEpisodeImages.classList.add('download-option-btn');
         btnDownloadCurrentEpisodeImages.innerHTML = '<i></i> Tải ảnh tập hiện tại';
         btnDownloadCurrentEpisodeImages.querySelector('i').classList.add('icon-single-image'); // Biểu tượng mới
-        panelBody.appendChild(btnDownloadCurrentEpisodeImages);
+        panelBodyElement.appendChild(btnDownloadCurrentEpisodeImages);
         btnDownloadCurrentEpisodeImages.onclick = () => {
             updateCurrentEpisodeImageList(); // Cạo ảnh DOM một lần nữa ngay trước khi hành động
             if (imageData.length === 0) return Swal.fire('Không tìm thấy ảnh', 'Hãy cuộn trang hoặc chờ tải API để có thêm ảnh.', 'error');
@@ -722,7 +762,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         btnDownloadAllDramaImages.classList.add('download-option-btn');
         btnDownloadAllDramaImages.innerHTML = '<i></i> Tải TẤT CẢ ảnh Drama';
         btnDownloadAllDramaImages.querySelector('i').classList.add('icon-all-images');
-        panelBody.appendChild(btnDownloadAllDramaImages);
+        panelBodyElement.appendChild(btnDownloadAllDramaImages);
         btnDownloadAllDramaImages.onclick = () => {
             if (allDramaImageData.length === 0) return Swal.fire('Không tìm thấy ảnh', 'Chưa có dữ liệu ảnh cho toàn bộ drama. Hãy đảm bảo bạn đã vào trang chi tiết drama chính.', 'warning');
             startZipImages(allDramaImageData, `${sanitizeFilename(currentDramaTitle)}_All_Drama`);
@@ -733,10 +773,16 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         toggleButton.addEventListener('click', () => {
             panel.classList.toggle('collapsed');
             toggleButton.innerHTML = panel.classList.contains('collapsed') ? '►' : '▼'; // Thay đổi mũi tên
+            // Điều chỉnh chiều cao sau khi thay đổi trạng thái collapse để đảm bảo hiển thị đúng
+            if (!panel.classList.contains('collapsed')) {
+                // Cho phép transition CSS kết thúc trước khi điều chỉnh lại chiều cao
+                setTimeout(adjustPanelHeight, 300);
+            }
         });
 
 
         document.body.appendChild(panel);
+        adjustPanelHeight(); // Điều chỉnh chiều cao ban đầu khi panel được tạo
     }
 
     // --- Móc API để thu thập dữ liệu ---
@@ -839,6 +885,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         // Thực hiện cập nhật danh sách ảnh ban đầu cho tập hiện tại sau khi DOM sẵn sàng
         // Điều này sẽ thu thập các ảnh từ DOM khi trang vừa tải.
         updateCurrentEpisodeImageList();
+
+        // Lắng nghe sự kiện resize của cửa sổ để điều chỉnh chiều cao panel
+        window.addEventListener('resize', adjustPanelHeight);
 
         // Thiết lập MutationObserver để bắt các ảnh được tải động cho tập hiện tại
         const observer = new MutationObserver((mutationsList, observer) => {
